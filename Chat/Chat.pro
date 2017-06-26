@@ -46,5 +46,6 @@ FORMS    += \
     loginwindow.ui \
     messagewindow.ui
 
+
 RESOURCES += \
     rsc.qrc

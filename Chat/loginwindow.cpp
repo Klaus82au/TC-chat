@@ -9,7 +9,7 @@ LoginWindow::LoginWindow(QWidget *parent) :
 {
     ui->setupUi(this);
     connect(ui->loginButton, SIGNAL(clicked(bool)), this, SLOT(loginSuccess()));
-
+    setFixedSize(162, 132);
 
 }
 void LoginWindow::loginSuccess()

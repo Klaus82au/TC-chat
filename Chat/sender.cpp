@@ -1,64 +1,73 @@
 #include "sender.h"
+#include "controller.h"
+
+void *Sender::work(void * obj)
+{
+    ((Sender*)obj)->send();
+    return nullptr;
+}
 
 Sender::~Sender()
 {
+    qDebug()<<"sender destroy";
+    pthread_attr_destroy(&pthread_attr);
     close(sock);
 }
 
-Sender::Sender(QString &_ip, int _port, char _type, QByteArray &_data, char _busy)
+Sender::Sender(QString &_ip, char _type, QByteArray &_data, char _busy, QObject *parent)
 {
-//    ip = _ip;
-//    port = _port;
-//    type = _type;
-//    data = _data;
-//    busy = _busy;
-
     memset(buf, '\0', BUF_SIZE);
     strncat(buf, &_type, sizeof(_type));
 
-    switch (_type) {
-    case TYPE_STATUS:
+    if (TYPE_STATUS == _type)
+    {
         strncat(buf, &_busy, sizeof(_busy));
         strncat(buf, _data.data(), _data.size());
-        break;
-    case TYPE_NEW_MESSAGE:
-        strncat(buf, _data.data(), _data.size());
-        break;
-    default:
-        break;
+    }
+    else if (TYPE_NEW_MESSAGE == _type)
+    {
+        QByteArray nickname = Controller::instance()->getNickname().toLatin1();
+        char size = nickname.length();
+        strncat(buf, &size, sizeof(size));
+        strncat(buf, nickname.data(), nickname.size());
+        strncat(buf, _data, _data.size());
+    }
+    else if (TYPE_WHO_IS_THERE == _type)
+    {
     }
 
     memset(&_addr, 0, sizeof(_addr));
     _addr.sin_family = AF_INET;
     _addr.sin_addr.s_addr = inet_addr(_ip.toStdString().c_str());
-    _addr.sin_port = htons(_port);
+    _addr.sin_port = htons(UDP_LISTENER_PORT);
 
 }
 
-Sender::Sender(in_addr_t _ip, in_port_t _port, char _type, QByteArray _data, char _busy)
+int Sender::start()
 {
-    memset(buf, '\0', BUF_SIZE);
-    strncat(buf, &_type, sizeof(_type));
+    int ret;
+    pthread_attr_init(&pthread_attr);
 
-    switch (_type) {
-    case TYPE_STATUS:
-        strncat(buf, &_busy, sizeof(_busy));
-        strncat(buf, _data.data(), _data.size());
-        break;
-    case TYPE_NEW_MESSAGE:
-        strncat(buf, _data.data(), _data.size());
-        break;
-    default:
-        break;
+    pthread_attr_setdetachstate(&pthread_attr, PTHREAD_CREATE_DETACHED);
+
+    ret = pthread_create(&thread,
+                         &pthread_attr,
+                         &Sender::work,
+                         this);
+
+    if ( 0 != ret )
+    {
+        //TODO
+        //        perror("Error mes: ");
+        //        fprintf(stderr,"Error - pthread_create() return error code: %d\n",ret);
+
+        qDebug()<<"Can't start Sender thread";
+        return PTHREAD_CREATE_ERROR;
     }
 
-    char sm[255];
-    inet_ntop(AF_INET, &_ip, sm, 255 );
-    int i = ntohs(_port);
-    memset(&_addr, 0, sizeof(_addr));
-    _addr.sin_family = AF_INET;
-    _addr.sin_addr.s_addr = _ip;
-    _addr.sin_port = _port;
+    qDebug()<<"Start Sender thread";
+
+    return SUCCESS;
 }
 
 int Sender::send()
@@ -94,11 +103,13 @@ int Sender::send()
 
     if(rc<0)
     {
+        qDebug()<<"errno --- "<<errno;
+        qDebug()<<"errmsg --- "<<strerror(errno);
         //TODO
         //        printf("%s: cannot send data \n",argv[0]);
         //        close(sock);
         return SENDTO_ERROR;
     }
-
+    deleteLater();
     return SUCCESS;
 }

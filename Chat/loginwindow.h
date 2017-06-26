@@ -14,6 +14,7 @@ class LoginWindow : public QDialog
 public:
     explicit LoginWindow(QWidget *parent = 0);
     ~LoginWindow();
+
 public slots:
     void loginSuccess();
 signals:

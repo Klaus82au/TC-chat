@@ -7,11 +7,11 @@ Listener::Listener(QObject *parent) : QObject(parent)
 
 }
 
-int Listener::init(QString _ip, int port)
+int Listener::init(QString _ip)
 {
     ip = _ip;
 
-    sock = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 
     if ( -1 == sock )
     {
@@ -23,7 +23,7 @@ int Listener::init(QString _ip, int port)
     // bind the port
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
-    addr.sin_port = htons(port);
+    addr.sin_port = htons(UDP_LISTENER_PORT);
     addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
     int status = bind(sock,
@@ -43,6 +43,8 @@ int Listener::init(QString _ip, int port)
 
 int Listener::listen()
 {
+    qDebug()<<"Listener listen";
+
     sockaddr_in peer_addr;
     char *buf = new char[BUF_SIZE];
     memset(buf, '\0', BUF_SIZE);
@@ -58,6 +60,7 @@ int Listener::listen()
 
     if ( -1 == result )
     {
+        qDebug()<<"Listener recvfrom err";
         //TODO
         //        ERROR_MSG("recvfrom error");
         return ERROR;
@@ -71,6 +74,7 @@ int Listener::listen()
     }
     else
     {
+        qDebug()<<"thread_Listen_Thread--- other pack";
         _msg message;
         message.addr = peer_addr;
         message.data = buf;
@@ -92,23 +96,33 @@ int Listener::start()
     ret = pthread_create(&thread,
                          &pthread_attr,
                          &Listener::work,
-                         nullptr);
+                         (void*)nullptr);
 
     if ( 0 != ret )
     {
         //TODO
         //        perror("Error mes: ");
         //        fprintf(stderr,"Error - pthread_create() return error code: %d\n",ret);
+
+        qDebug()<<"Can't start listener thread";
         return PTHREAD_CREATE_ERROR;
     }
+
+    qDebug()<<"Start listener thread";
 
     return SUCCESS;
 }
 
 void *Listener::work(void *)
 {
+    qDebug()<<"Listener work";
     while (1)
     {
         Listener::instance()->listen();
     }
+}
+
+Listener::~Listener()
+{
+    pthread_attr_destroy(&pthread_attr);
 }

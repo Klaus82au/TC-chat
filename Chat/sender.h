@@ -6,6 +6,8 @@
 #include <unistd.h>
 
 #include <QObject>
+#include <QDebug>
+
 #include "global_def.h"
 
 class Sender : public QObject
@@ -14,21 +16,18 @@ class Sender : public QObject
 
     int sock;
     sockaddr_in _addr;
-
+    pthread_t thread;
+    pthread_attr_t pthread_attr;
     char buf[BUF_SIZE];
-    //    QByteArray data;
-    //    QString ip;
 
-    //    int port;
-    //    int sec;
-    //    char type;
-    //    char busy;
+    static void* work(void*obj);
 
 public:
     ~Sender();
     Sender(QObject *parent = 0) = delete;
-    Sender(QString &_ip, int _port, char _type, QByteArray &_data, char _busy = 0);
-    Sender(in_addr_t _ip, in_port_t _port, char _type, QByteArray _data, char _busy = 0);
+    Sender(QString &_ip, char _type, QByteArray &_data, char _busy = 0, QObject *parent = 0);
+
+    int start();
     int send();
 
 signals:

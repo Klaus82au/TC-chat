@@ -30,6 +30,7 @@ class Listener : public QObject
     static void* work(void*);
 
 public:
+    ~Listener();
     static Listener* instance()
     {
         if (!s_instance)
@@ -37,7 +38,7 @@ public:
         return s_instance;
     }
 
-    int init(QString _ip, int port);
+    int init(QString _ip);
 
     int start();
 

@@ -7,8 +7,7 @@ int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);
     MsgQ::instance();
-//    Widget::instance()->show();
-    Controller::instance()->configureTray();
+    Controller::instance()->configureTrayAndShow();
 
     return a.exec();
 }

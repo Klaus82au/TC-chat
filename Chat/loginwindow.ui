@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Dialog</string>
+   <string>Log In</string>
   </property>
   <property name="styleSheet">
    <string notr="true">background-color: rgb(85, 87, 83)</string>
@@ -50,9 +50,6 @@ color:white</string>
       </property>
       <property name="text">
        <string/>
-      </property>
-      <property name="maxLength">
-       <number>10</number>
       </property>
       <property name="placeholderText">
        <string>Enter nickname</string>

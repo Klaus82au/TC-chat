@@ -11,17 +11,17 @@ Controller *Controller::s_instance = nullptr;
 Controller::Controller(QObject *parent) : QObject(parent)
 {
     _status = ONLINE;
-    //    connect(&w_login, &LoginWindow::logedIn, this, &Controller::startListener);
 
     connect(MsgQ::instance(), &MsgQ::newmsg, this, &Controller::inputMessage);
-    connect(&w_login, &LoginWindow::logedIn, this, &Controller::setNicknameAndIp);
-    //provide network interfaces for login
+    connect(&_w_login, &LoginWindow::logedIn, this, &Controller::setNicknameAndIp);
+
     getAllInterfaces();
-    connect(this, SIGNAL(loginInterfaces(QStringList)),
-            &w_login, SLOT(setInterfaces(QStringList)));
-    emit loginInterfaces(interfaces);
-    //broadcast our satus on timeout
-    connect(&timer, &QTimer::timeout, this, &Controller::sendToAll);
+
+}
+
+QString Controller::getNickname() const
+{
+    return _nickname;
 }
 
 void Controller::setStatus(bool st)
@@ -53,23 +53,23 @@ void Controller::setNicknameAndIp(const QString &nickname, const QString &ip)
     //    timer.start(TIMER_INTERVAL);
 }
 
-void Controller::configureTray()
+void Controller::configureTrayAndShow()
 {
     _tray.setIcon(QIcon("://icons/ico.ico"));
     QAction * loginAct = new QAction(tr("&Log In"), this);
     QAction * quitAct = new QAction(tr("&Quit"), this);
     connect(loginAct, SIGNAL(triggered(bool)), this, SLOT(userLoginActionHandle()));
     connect(quitAct, SIGNAL(triggered(bool)), this, SLOT(quitActionHandle()));
-    menu.addAction(loginAct);
-    menu.addAction(quitAct);
-    _tray.setContextMenu(&menu);
+    _menu.addAction(loginAct);
+    _menu.addAction(quitAct);
+    _tray.setContextMenu(&_menu);
     _tray.show();
 }
 
 void Controller::userLoginActionHandle()
 {
     qDebug()<<"userLogin()";
-    w_login.show();
+    _w_login.show();
 }
 
 
@@ -77,14 +77,13 @@ void Controller::newMsgActionHandle()
 {
     QString ip = _ip.left(_ip.lastIndexOf('.')+1)+"255";
     QByteArray nic;
-    Sender broadcast(ip,
-                     UDP_LISTENER_PORT,
-                     TYPE_WHO_IS_THERE,
-                     nic,
-                     _status);
-    broadcast.send();
-
-    w_newMsg.show();
+    Sender *broadcast = new Sender(ip,
+                                   (char)TYPE_WHO_IS_THERE,
+                                   nic,
+                                   _status);
+    broadcast->start();
+    _w_newMsg.clearBox();
+    _w_newMsg.show();
 }
 
 void Controller::quitActionHandle()
@@ -96,23 +95,15 @@ void Controller::enableActionsAfterLogin()
 {
     QAction * newmsgAct = new QAction(tr("&New Message"), this);
     QAction * busyStatusAct = new QAction(tr("&I'm busy"), this);
-    menu.removeAction(menu.actions().at(0));
-    menu.insertAction(menu.actions().at(0), busyStatusAct);
+
     busyStatusAct->setCheckable(true);
+
+    _menu.removeAction(_menu.actions().at(0));
+    _menu.insertAction(_menu.actions().at(0), busyStatusAct);
+    _menu.insertAction(_menu.actions().at(0), newmsgAct);
+
     connect(busyStatusAct, &QAction::toggled, this,  &Controller::setStatus);
-    menu.insertAction(menu.actions().at(0), newmsgAct);
     connect(newmsgAct, SIGNAL(triggered(bool)), this, SLOT(newMsgActionHandle()));
-}
-
-QString Controller::getIp() const
-{
-    return _ip;
-}
-
-void Controller::setIp(const QString &ip)
-{
-    _ip = ip;
-    startListener();
 }
 
 void Controller::inputMessage()
@@ -125,33 +116,39 @@ void Controller::inputMessage()
         QString msg(message.data+2);
         char ip[STR_LEN];
         inet_ntop(AF_INET, &message.addr.sin_addr.s_addr, ip, sizeof(ip) );
-        msg.append(" - " + QString::number(message.data[1]) +  ip);
-        w_newMsg.updateCombobox(msg);
+        QString status = (message.data[1]==BUSY)?"busy":"online";
+        msg.append(" - " + status + " " +  ip);
+        _w_newMsg.updateCombobox(msg);
     }
     else if (TYPE_NEW_MESSAGE == type)
     {
-        QString msg(message.data+1);
-        showPopup("nado nick", msg, message.addr);
+        QString msg(message.data + message.data[1] + 2);
+        char nicname[STR_LEN];
+        strncpy(nicname, message.data+2, message.data[1]);
+        showPopup(nicname, msg, message.addr);
     }
     else if (TYPE_WHO_IS_THERE == type)
     {
-//        Sender s(message.addr.sin_addr.s_addr,
-//                 UDP_LISTENER_PORT,
-//                 TYPE_STATUS,
-//                 _nickname.toLatin1(),
-//                 _status);
-        QString ip = "172.20.8.130";
-        QByteArray data = _nickname.toLatin1();
-        Sender s(ip, UDP_LISTENER_PORT, TYPE_STATUS,
-                 data, _status);
-        s.send();
+        QByteArray ba =_nickname.toLatin1();
+
+        char cip[255];
+        inet_ntop(AF_INET, &message.addr.sin_addr.s_addr, cip, 255 );
+        QString ip(cip);
+        Sender *s = new Sender(ip,
+                               (char)TYPE_STATUS,
+                               ba,
+                               _status);
+        s->start();
     }
+
     delete[] message.data;
 }
 
 void Controller::getAllInterfaces()
 {
-    interfaces.clear();
+    QStringList interfaces;
+    connect(this, SIGNAL(loginInterfaces(QStringList)),
+            &_w_login, SLOT(setInterfaces(QStringList)));
     struct ifaddrs *i_list;
 
     if (-1 ==  getifaddrs(&i_list))
@@ -183,41 +180,12 @@ void Controller::getAllInterfaces()
         }
     }
 
-    //TODO
-    //call wtis when work is done
+    emit loginInterfaces(interfaces);
     freeifaddrs(i_list);
-}
-
-int Controller::sendTo(QString ip, int port, QString buf)
-{
-    //TODO
-    return 0;
-}
-
-int Controller::sendToAll()
-{
-    QString ip = _ip.left(_ip.lastIndexOf('.')+1)+"255";
-    QByteArray nic = _nickname.toLatin1();
-    Sender broadcast(ip,
-                     UDP_LISTENER_PORT,
-                     TYPE_STATUS,
-                     nic,
-                     _status);
-    if ( SUCCESS == broadcast.send() )
-    {
-        return SUCCESS;
-    }
-    else
-    {
-        return SENDER_PROC_ERROR;
-    }
 }
 
 int Controller::startListener()
 {
-
-    Listener::instance()->init(_ip, UDP_LISTENER_PORT);
+    Listener::instance()->init(_ip);
     return  Listener::instance()->start();
-
-    return SUCCESS;
 }

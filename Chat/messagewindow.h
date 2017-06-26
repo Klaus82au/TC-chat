@@ -4,6 +4,7 @@
 #include <QDialog>
 
 #include <sender.h>
+#include <QCloseEvent>
 //input message window
 namespace Ui {
 class MessageWindow;
@@ -19,7 +20,9 @@ public:
 
     //updates peers in combobox
     void updateCombobox(QString str);
-
+        void clearBox();
+protected:
+    void closeEvent(QCloseEvent *);
 private slots:
     void on_sendButton_clicked();
 
