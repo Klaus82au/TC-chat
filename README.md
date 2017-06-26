@@ -1,10 +1,9 @@
 # TC-chat
 TC Homwork
 
-
-The team faced some problems.
-
-Sending messages to one another works fine (in test conditions)
-but getting a list of online users turned out to be difficult, due to peer to peer architecture.
-
-We tried to solve it, but the issue needs more time;
+This chat has many cool features:
+  it's peer to peer (no server at all)
+      + your messages are sent intermediary
+      + there is no database with usernames, passwords, etc...
+      - you can only chat with ppl who are online ATM
+  it has stealthy interface, that works from the tray
